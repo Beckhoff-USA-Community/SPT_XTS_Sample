@@ -1,0 +1,207 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="FB_Machine" Id="{4e4318f4-3c59-4991-8a92-c5eb7964ba7a}" SpecialFunc="None">
+    <Declaration><![CDATA[FUNCTION_BLOCK FB_Machine EXTENDS FB_PackML_BaseModule
+VAR
+	XPU					   : FB_Component_XPU := (Name := 'XPU 1', Stations := ipStations, MoverAssignmentStorageLocation := E_MoverAssignmentRecoverySource.eMoverAssignmentRecoverySource_NoBackup);
+	Station1			   : FB_XTS_QueueStation;
+	Station2			   : FB_XTS_SimpleStation;
+	Station3			   : FB_XTS_QueueStation;
+	Station4			   : FB_XTS_SimpleStation;
+	StationConfig_Station1 : ST_XTSStationConfig;
+	StationConfig_Station2 : ST_XTSStationConfig;
+	StationConfig_Station3 : ST_XTSStationConfig;
+	StationConfig_Station4 : ST_XTSStationConfig;
+	ipStations			   : ARRAY[0..TcIoXtsEnvironmentParameterList.MaxXtsInfoServer * TcIoXtsEnvironmentParameterList.MaxXtsInfoStation] OF I_XTS_ApplicationStation;
+END_VAR]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[]]></ST>
+    </Implementation>
+    <Method Name="Aborting" Id="{43dc108a-8395-49bb-be95-725f427c79c4}">
+      <Declaration><![CDATA[METHOD PROTECTED Aborting]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE SequenceState OF
+	0:
+		IF XPU.State = E_XTSState.eXTSState_Enabled OR XPU.State = E_XTSState.eXTSState_Disabling THEN
+			IF XPU.Disable() THEN
+				SequenceState := SequenceState + 10;
+			END_IF
+		ELSIF XPU.State = E_XTSState.eXTSState_Disabled OR XPU.State = E_XTSState.eXTSState_Error THEN
+			SequenceState := SequenceState + 10;
+		END_IF
+
+	10:
+		SUPER^.Aborting();
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Clearing" Id="{901e277a-9ce8-479f-a601-ed483dad6dbb}">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Clearing</b> state
+METHOD PROTECTED Clearing
+
+(*! <description> <b>Note:</b> The <i>Clear</i> command can also be thought of as a <i>fault reset</i> depite the ambiguity in the naming of the <i>Reset</i> state. 
+<table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> Aborted </td>
+		<td> Clear Command </td> 
+		<td> State Complete </td>
+		<td> Stopped </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[	CASE SequenceState OF 
+		0:
+			IF XPU.Reset() THEN
+				SequenceState := SequenceState + 10;	
+			END_IF
+			
+		10:
+			SUPER^.Clearing();
+	END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Initialize" Id="{af0b6317-262e-4437-949c-3f24b5e15100}">
+      <Declaration><![CDATA[//! @summary Basic module initialization logic
+METHOD PROTECTED Initialize : BOOL;
+
+//! @description This method is called by <c>CyclicLogic()</c> as required]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[ipComponents[1]							 := XPU;
+ipSubModules[1]							 := Station1;
+ipSubModules[2]							 := Station2;
+ipSubModules[3]							 := Station3;
+ipSubModules[4]							 := Station4;
+ipStations[1]							 := Station1;
+ipStations[2]							 := Station2;
+ipStations[3]							 := Station3;
+ipStations[4]							 := Station4;
+Station1.Config							 := StationConfig_Station1;
+Station2.Config							 := StationConfig_Station2;
+Station3.Config							 := StationConfig_Station3;
+Station4.Config							 := StationConfig_Station4;
+
+StationConfig_Station1.IsAQueueStation	 := TRUE;
+StationConfig_Station1.Dynamics.Velocity := 500;
+StationConfig_Station2.Dynamics.Velocity := 500;
+StationConfig_Station3.IsAQueueStation	 := TRUE;
+StationConfig_Station3.Dynamics.Velocity := 500;
+StationConfig_Station4.Dynamics.Velocity := 500;
+XPU.Stations							 := ipStations;
+Initialize								 := SUPER^.Initialize();]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Resetting" Id="{439a14f0-0116-0742-2bdf-51843ee1aee5}">
+      <Declaration><![CDATA[METHOD PROTECTED Resetting]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE SequenceState OF
+	0:
+		IF XPU.Enable() THEN
+			SequenceState := SequenceState + 10;
+		END_IF
+
+	10:
+//		IF NOT XPU.Busy THEN
+//			SequenceState := SequenceState + 10;
+//		END_IF
+
+//	20:
+		SUPER^.Resetting();
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <Method Name="Stopping" Id="{203b2ea6-6c39-4340-88eb-5023c227b9dd}">
+      <Declaration><![CDATA[//! @summary This method contains code which will execute when this PackML module is in the <b>Stopping</b> state
+METHOD PROTECTED Stopping
+VAR
+	i				: UDINT;
+	SubModulesReady : BOOL := TRUE;
+END_VAR
+
+(*! <description><b></b><table> 
+	<tr>
+		<th> Previous State </th>
+		<th> Transition In </th>
+		<th> Transition Out </th>
+		<th> Next State  </th> 
+	</tr>
+	<tr>
+		<td> <b>ANY<i>except</i></b>Stopped<b>-or-</b>Clearing<b>-or-</b>Aborted<b>-or-</b>Aborting</td>
+		<td> Stop Command </td> 
+		<td> State Complete </td>
+		<td> Stopped </td> 
+	</tr>
+</table>
+This method is called as required by <c>StateControl()</c>
+</description> 
+
+*)]]></Declaration>
+      <Implementation>
+        <ST><![CDATA[CASE SequenceState OF
+	0:
+		// Send stop command to all sub modules
+		FOR i := 1 TO NumberOfSubModules DO
+			ipSubModules[i].StateCommand := ePMLCommand_Stop;
+		END_FOR
+
+		FOR i := 1 TO NumberOfSubModules DO
+			SubModulesReady := SubModulesReady AND (ipSubModules[i].CurrentState = ePMLState_Stopped OR ipSubModules[i].CurrentState = ePMLState_Aborted);
+		END_FOR
+
+		IF SubModulesReady THEN
+			SequenceState := SequenceState + 10;
+		END_IF
+
+	10:
+		IF XPU.Disable() THEN
+			SequenceState := SequenceState + 10;
+		END_IF
+
+	20:
+		IF XPU.State = E_XTSState.eXTSState_Disabled THEN
+			SequenceState := SequenceState + 10;
+		END_IF
+
+	30:
+		StateComplete();
+END_CASE]]></ST>
+      </Implementation>
+    </Method>
+    <LineIds Name="FB_Machine">
+      <LineId Id="110" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_Machine.Aborting">
+      <LineId Id="567" Count="11" />
+      <LineId Id="29" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_Machine.Clearing">
+      <LineId Id="27" Count="1" />
+      <LineId Id="30" Count="2" />
+      <LineId Id="34" Count="2" />
+      <LineId Id="29" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_Machine.Initialize">
+      <LineId Id="33" Count="12" />
+      <LineId Id="53" Count="0" />
+      <LineId Id="46" Count="6" />
+      <LineId Id="21" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_Machine.Resetting">
+      <LineId Id="222" Count="12" />
+      <LineId Id="5" Count="0" />
+    </LineIds>
+    <LineIds Name="FB_Machine.Stopping">
+      <LineId Id="718" Count="26" />
+      <LineId Id="26" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>

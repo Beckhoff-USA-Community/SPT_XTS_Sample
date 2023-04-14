@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.12">
+  <POU Name="MAIN" Id="{a42bdb35-f349-4c08-b658-08641a64a249}" SpecialFunc="None">
+    <Declaration><![CDATA[PROGRAM MAIN
+VAR
+	Machine : FB_Machine;
+	ControlSource : FB_ControlSource;
+END_VAR
+]]></Declaration>
+    <Implementation>
+      <ST><![CDATA[IF _TaskInfo[1].FirstCycle THEN
+	Machine.RegisterExternalController(ControlSource);
+END_IF
+
+
+Machine.CyclicLogic();
+ControlSource.CyclicLogic();]]></ST>
+    </Implementation>
+    <LineIds Name="MAIN">
+      <LineId Id="11" Count="2" />
+      <LineId Id="9" Count="1" />
+      <LineId Id="2" Count="0" />
+      <LineId Id="8" Count="0" />
+    </LineIds>
+  </POU>
+</TcPlcObject>
